@@ -22,6 +22,7 @@ interface StatusIndicatorProps {
   fileName?: string;
   taskId?: string;
   uploadProgress?: number | null;
+  hasNormalizedText?: boolean;
 }
 
 interface StepConfig {
@@ -66,6 +67,7 @@ export function StatusIndicator({
   fileName,
   taskId,
   uploadProgress,
+  hasNormalizedText,
 }: StatusIndicatorProps) {
   const [copied, setCopied] = useState(false);
 
@@ -129,15 +131,24 @@ export function StatusIndicator({
               </div>
             )}
 
+            {hasNormalizedText && (
+              <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>
+                  <strong>Нормализованный текст сохранён.</strong> Повторное обращение к сервису GigaSTT не требуется. Нажатие кнопки ниже сразу запустит только финальный этап — формирование протокола нейросетью.
+                </span>
+              </div>
+            )}
+
             {onRetry && (
               <div>
                 <button
                   type="button"
                   onClick={onRetry}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white text-xs font-medium hover:bg-red-700 transition-colors"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white text-xs font-medium hover:bg-red-700 transition-colors shadow-xs"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
-                  Повторить попытку
+                  {hasNormalizedText ? 'Сформировать протокол заново (ИИ)' : 'Повторить попытку'}
                 </button>
               </div>
             )}

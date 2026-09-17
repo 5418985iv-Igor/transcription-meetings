@@ -1,38 +1,62 @@
 'use client';
 
 import React from 'react';
-import { FileText, CheckCircle2, AlertCircle, RefreshCw, Activity } from 'lucide-react';
+import { FileText, CheckCircle2, AlertCircle, RefreshCw, Activity, RotateCcw } from 'lucide-react';
 
 interface HeaderProps {
   serverOnline?: boolean | null;
   onRefreshHealth?: () => void;
   isCheckingHealth?: boolean;
+  onNewRecording?: () => void;
+  hasActiveTask?: boolean;
 }
 
-export function Header({ serverOnline, onRefreshHealth, isCheckingHealth }: HeaderProps) {
+export function Header({
+  serverOnline,
+  onRefreshHealth,
+  isCheckingHealth,
+  onNewRecording,
+  hasActiveTask,
+}: HeaderProps) {
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-2">
         {/* Brand */}
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-sm shadow-indigo-200">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-sm shadow-indigo-200 shrink-0">
             <FileText className="w-5 h-5" />
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="font-bold text-slate-900 text-lg tracking-tight">Ю-Терм</span>
-              <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">
-                Протоколы совещаний
+              <span className="font-bold text-slate-900 text-lg tracking-tight truncate">
+                Ю-Терм. Протоколы совещаний
               </span>
             </div>
-            <p className="text-xs text-slate-500 hidden sm:block">
+            <p className="text-xs text-slate-500 hidden sm:block truncate">
               Разговор закончился — результат остался
             </p>
           </div>
         </div>
 
-        {/* Server Status indicator & Health Check button */}
-        <div className="flex items-center gap-2.5">
+        {/* Actions & Server Status indicator */}
+        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+          {onNewRecording && (
+            <button
+              type="button"
+              id="header-new-btn"
+              onClick={onNewRecording}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer shadow-2xs active:scale-95 ${
+                hasActiveTask
+                  ? 'bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white shadow-indigo-200'
+                  : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/70'
+              }`}
+              title="Загрузить новое совещание"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Новое</span>
+            </button>
+          )}
+
           {onRefreshHealth && (
             <button
               type="button"

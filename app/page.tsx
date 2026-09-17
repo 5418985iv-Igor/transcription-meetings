@@ -6,7 +6,7 @@ import { AudioUploader } from '@/components/AudioUploader';
 import { StatusIndicator } from '@/components/StatusIndicator';
 import { ResultsViewer } from '@/components/ResultsViewer';
 import { RecentTasks } from '@/components/RecentTasks';
-import { ServerHealthWidget, HealthCheckData } from '@/components/ServerHealthWidget';
+import { HealthCheckData } from '@/components/ServerHealthWidget';
 import { TaskRecord } from '@/lib/tasks/store';
 import {
   loadHistoryFromStorage,
@@ -75,6 +75,7 @@ export default function MeetingProtocolsPage() {
   const [serverInfo, setServerInfo] = useState<HealthCheckData | null>(null);
   const [isCheckingHealth, setIsCheckingHealth] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [isRegeneratingProtocol, setIsRegeneratingProtocol] = useState(false);
 
   // Polling interval ref
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -497,6 +498,13 @@ export default function MeetingProtocolsPage() {
       stopPolling();
 
       const existing = historyTasks.find((t) => t.id === taskId);
+
+      // CRITICAL: If normalizedText is already available, NEVER poll GigaSTT or restart speech recognition!
+      if (existing?.normalizedText?.trim()) {
+        setCurrentTask(existing);
+        return;
+      }
+
       const isAlreadyHaveRaw = Boolean(existing?.rawText && existing.rawText.trim().length > 0);
 
       const targetTask: TaskRecord = existing
@@ -590,12 +598,83 @@ export default function MeetingProtocolsPage() {
   // Retry processing
   const handleRetry = async () => {
     if (!currentTask) return;
+    // CRITICAL: If normalizedText is already available, retrying should ONLY regenerate the protocol!
+    // NEVER call GigaSTT or restart speech recognition!
+    if (currentTask.normalizedText?.trim()) {
+      void handleRegenerateProtocol();
+      return;
+    }
     void handleResumeTask(currentTask.id, currentTask.fileName);
   };
+
+  // Regenerate protocol using normalized text and latest meeting protocol prompt
+  const handleRegenerateProtocol = useCallback(async () => {
+    if (!currentTask || !currentTask.normalizedText?.trim()) return;
+    const targetTaskId = currentTask.id;
+    const normalizedText = currentTask.normalizedText.trim();
+    const rawText = currentTask.rawText || '';
+    const fileName = currentTask.fileName || 'Аудиозапись';
+
+    setIsRegeneratingProtocol(true);
+
+    // Keep ResultsViewer active; don't wipe the task into an unrendered state
+    setCurrentTask((prev) =>
+      prev
+        ? {
+            ...prev,
+            error: undefined,
+            stepMessage: 'Формирование нового протокола нейросетью...',
+          }
+        : null
+    );
+
+    try {
+      const res = await fetch(
+        withBasePath(`/api/tasks/${encodeURIComponent(targetTaskId)}/regenerate-protocol`),
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            normalizedText,
+            rawText,
+            fileName,
+          }),
+        }
+      );
+      const data = await parseApiResponse<{ success: boolean; task?: TaskRecord; error?: string }>(res);
+
+      if (!res.ok || !data.task) {
+        throw new Error(data.error || 'Не удалось переформировать протокол');
+      }
+
+      const updatedTask = data.task;
+      setCurrentTask(updatedTask);
+      setHistoryTasks((_prev) => upsertTaskInStorage(updatedTask));
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setCurrentTask((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: 'completed', // Keep as completed so ResultsViewer stays visible and doesn't lock out the user!
+              error: `Ошибка составления протокола: ${msg}`,
+              stepMessage: 'Не удалось переформировать протокол по новому промпту',
+            }
+          : null
+      );
+    } finally {
+      setIsRegeneratingProtocol(false);
+    }
+  }, [currentTask]);
 
   const handleReset = () => {
     stopPolling();
     setCurrentTask(null);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   const isBusy =
@@ -610,6 +689,8 @@ export default function MeetingProtocolsPage() {
         serverOnline={serverOnline}
         onRefreshHealth={handleRefreshHealth}
         isCheckingHealth={isCheckingHealth}
+        onNewRecording={handleReset}
+        hasActiveTask={Boolean(currentTask)}
       />
 
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-10 space-y-6">
@@ -623,13 +704,6 @@ export default function MeetingProtocolsPage() {
           </p>
         </div>
 
-        {/* Server Availability & Diagnostic Widget (FastAPI Health Check) */}
-        <ServerHealthWidget
-          serverInfo={serverInfo}
-          isLoading={isCheckingHealth}
-          onCheckHealth={handleRefreshHealth}
-        />
-
         {/* Main Content Workspace */}
         <div className="space-y-6">
           {/* Upload Area (shown when no task is running) */}
@@ -641,7 +715,7 @@ export default function MeetingProtocolsPage() {
           )}
 
           {/* Status / Stepper Card (shown when a task is active or errored) */}
-          {currentTask && (
+          {currentTask && (currentTask.status !== 'completed' || currentTask.error) && (
             <StatusIndicator
               status={currentTask.status}
               stepMessage={currentTask.stepMessage}
@@ -650,6 +724,7 @@ export default function MeetingProtocolsPage() {
               fileName={currentTask.fileName}
               taskId={currentTask.id}
               uploadProgress={uploadProgress}
+              hasNormalizedText={Boolean(currentTask.normalizedText?.trim())}
             />
           )}
 
@@ -666,6 +741,9 @@ export default function MeetingProtocolsPage() {
                 fileName={currentTask.fileName}
                 taskId={currentTask.id}
                 onReset={handleReset}
+                onRegenerateProtocol={handleRegenerateProtocol}
+                isRegeneratingProtocol={isRegeneratingProtocol}
+                error={currentTask.error}
               />
             )}
         </div>
@@ -696,11 +774,7 @@ export default function MeetingProtocolsPage() {
       {/* Clean enterprise footer */}
       <footer className="border-t border-slate-200/80 bg-white py-6 mt-12">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-700">Ю-Терм</span>
-            <span>•</span>
-            <span>Разговор закончился — результат остался</span>
-          </div>
+         
           <div>Корпоративный сервис протоколирования совещаний</div>
         </div>
       </footer>

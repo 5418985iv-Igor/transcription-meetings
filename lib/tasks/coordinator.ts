@@ -1,4 +1,4 @@
-import { getTask, updateTask, getAllTasks } from './store';
+import { getTask, updateTask, getAllTasks, type TaskRecord } from './store';
 import { normalizeTranscription, generateMeetingProtocol } from '../openai/service';
 import { transcriptionService } from '../transcription/fastapi-provider';
 
@@ -72,6 +72,61 @@ export async function runAiPipeline(taskId: string, rawText: string): Promise<vo
       status: 'error',
       error: `Ошибка обработки: ${msg}`,
     });
+  } finally {
+    activeAiTasks.delete(taskId);
+  }
+}
+
+/**
+ * Regenerates the meeting protocol from existing normalized text using
+ * the prompt loaded dynamically from prompts/meeting_protocol.txt.
+ * Strictly executes only the final step (protocol synthesis) without re-running
+ * speech transcription (GigaSTT) or text normalization.
+ */
+export async function regenerateProtocol(
+  taskId: string,
+  overrideNormalizedText?: string
+): Promise<TaskRecord> {
+  const task = getTask(taskId);
+  if (!task) {
+    throw new Error('Задача не найдена в хранилище сервера');
+  }
+
+  const normalizedText = (overrideNormalizedText || task.normalizedText)?.trim();
+  if (!normalizedText) {
+    throw new Error('Отсутствует нормализованный текст для составления протокола');
+  }
+
+  // Clear any previous stuck flag and mark active
+  activeAiTasks.delete(taskId);
+  activeAiTasks.add(taskId);
+
+  try {
+    updateTask(taskId, {
+      status: 'summarizing',
+      normalizedText,
+      stepMessage: 'Формирование нового протокола нейросетью...',
+      error: undefined,
+    });
+
+    const protocolText = await generateMeetingProtocol(normalizedText);
+
+    const updated = updateTask(taskId, {
+      status: 'completed',
+      protocolText,
+      stepMessage: 'Протокол успешно обновлен по новому промпту.',
+      error: undefined,
+    });
+
+    return updated || task;
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    updateTask(taskId, {
+      status: 'error',
+      error: `Ошибка составления протокола: ${msg}`,
+      stepMessage: 'Не удалось составить протокол',
+    });
+    throw err;
   } finally {
     activeAiTasks.delete(taskId);
   }

@@ -10,8 +10,9 @@ import {
   Check,
   Download,
   Printer,
-  RotateCcw,
+  RefreshCw,
   FileDown,
+  AlertCircle,
 } from 'lucide-react';
 import { downloadMeetingProtocolDocx } from '@/lib/export/word';
 
@@ -22,6 +23,9 @@ interface ResultsViewerProps {
   fileName?: string;
   taskId?: string;
   onReset?: () => void;
+  onRegenerateProtocol?: () => void | Promise<void>;
+  isRegeneratingProtocol?: boolean;
+  error?: string;
 }
 
 type TabType = 'protocol' | 'normalized' | 'raw';
@@ -33,6 +37,9 @@ export function ResultsViewer({
   fileName = 'meeting',
   taskId,
   onReset,
+  onRegenerateProtocol,
+  isRegeneratingProtocol = false,
+  error,
 }: ResultsViewerProps) {
   const [activeTab, setActiveTab] = useState<TabType>('protocol');
   const [copied, setCopied] = useState(false);
@@ -166,6 +173,27 @@ export function ResultsViewer({
 
         {/* Action Toolbar */}
         <div className="flex items-center gap-1.5 pb-2.5 sm:pb-0 flex-wrap">
+          {onRegenerateProtocol && Boolean(normalizedText) && (
+            <button
+              type="button"
+              id="regenerate-protocol-btn"
+              onClick={async () => {
+                setActiveTab('protocol');
+                await onRegenerateProtocol();
+              }}
+              disabled={isRegeneratingProtocol}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer shadow-2xs ${
+                isRegeneratingProtocol
+                  ? 'bg-amber-50 text-amber-800 border-amber-300'
+                  : 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white border-emerald-600'
+              } disabled:opacity-60 disabled:cursor-not-allowed`}
+              title="Переформировать протокол заново"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isRegeneratingProtocol ? 'animate-spin' : ''}`} />
+              <span>{isRegeneratingProtocol ? 'Формирование протокола...' : 'Переформировать протокол'}</span>
+            </button>
+          )}
+
           <button
             type="button"
             id="download-word-btn"
@@ -239,19 +267,6 @@ export function ResultsViewer({
             <Printer className="w-3.5 h-3.5 text-slate-500" />
             <span>Печать</span>
           </button>
-
-          {onReset && (
-            <button
-              type="button"
-              id="new-recording-btn"
-              onClick={onReset}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition-colors ml-1"
-              title="Загрузить новое совещание"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Новое</span>
-            </button>
-          )}
         </div>
       </div>
 
@@ -259,14 +274,53 @@ export function ResultsViewer({
       <div className="p-6 sm:p-8 min-h-[360px]">
         {activeTab === 'protocol' && (
           <div id="protocol-content" className="space-y-4">
-            {protocolText ? (
-              <div className="prose prose-slate max-w-none prose-headings:text-slate-900 prose-headings:font-bold prose-h1:text-xl prose-h2:text-base prose-h2:mt-6 prose-h2:mb-2 prose-h2:pb-1 prose-h2:border-b prose-h2:border-slate-100 prose-p:text-slate-700 prose-p:text-sm prose-li:text-sm prose-li:text-slate-700">
-                <Markdown>{protocolText}</Markdown>
+            {isRegeneratingProtocol ? (
+              <div className="text-center py-16 text-slate-600 flex flex-col items-center justify-center gap-3">
+                <RefreshCw className="w-8 h-8 text-emerald-600 animate-spin" />
+                <p className="font-semibold text-slate-800 text-sm">
+                  Формирование нового протокола...
+                </p>
+                <p className="text-xs text-slate-500 max-w-md">
+                  Нормализованный текст передается в нейросеть для составления протокола встречи
+                </p>
               </div>
             ) : (
-              <div className="text-center py-12 text-slate-400 text-sm">
-                Формирование протокола еще не завершено...
-              </div>
+              <>
+                {error && (
+                  <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-900 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+                    <div className="flex items-start gap-2.5">
+                      <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-semibold block text-red-950 mb-0.5">Ошибка формирования протокола</span>
+                        <span className="text-red-800">{error}</span>
+                      </div>
+                    </div>
+                    {onRegenerateProtocol && Boolean(normalizedText) && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await onRegenerateProtocol();
+                        }}
+                        disabled={isRegeneratingProtocol}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium text-xs shrink-0 cursor-pointer shadow-2xs"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        <span>Попробовать снова</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {protocolText ? (
+                  <div className="prose prose-slate max-w-none prose-headings:text-slate-900 prose-headings:font-bold prose-h1:text-xl prose-h2:text-base prose-h2:mt-6 prose-h2:mb-2 prose-h2:pb-1 prose-h2:border-b prose-h2:border-slate-100 prose-p:text-slate-700 prose-p:text-sm prose-li:text-sm prose-li:text-slate-700">
+                    <Markdown>{protocolText}</Markdown>
+                  </div>
+                ) : !error ? (
+                  <div className="text-center py-12 text-slate-400 text-sm">
+                    Формирование протокола еще не завершено...
+                  </div>
+                ) : null}
+              </>
             )}
           </div>
         )}
@@ -334,7 +388,7 @@ export function ResultsViewer({
         </div>
         <div className="text-[11px] text-slate-400">
           {activeTab === 'protocol'
-            ? 'Сформировано по стандартам Ю-Терм'
+            ? 'Протокол сформирован нейросетью'
             : activeTab === 'normalized'
             ? 'Текст нормализован без искажения смысла'
             : 'Точный результат модели GigaAM-v3'}

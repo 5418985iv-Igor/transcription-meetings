@@ -77,8 +77,8 @@ function sanitizeAndDeduplicate() {
   }
 }
 
-function loadFromDisk() {
-  if (globalStore.__taskStoreInitialized) return;
+function loadFromDisk(force = false) {
+  if (globalStore.__taskStoreInitialized && !force) return;
   globalStore.__taskStoreInitialized = true;
 
   try {
@@ -112,7 +112,12 @@ export function saveTask(record: TaskRecord): void {
 
 export function getTask(id: string): TaskRecord | undefined {
   loadFromDisk();
-  return tasks.get(id);
+  let found = tasks.get(id);
+  if (!found) {
+    loadFromDisk(true);
+    found = tasks.get(id);
+  }
+  return found;
 }
 
 /**
@@ -123,13 +128,20 @@ export function findTask(idOrAlias: string): TaskRecord | undefined {
   loadFromDisk();
   if (!idOrAlias) return undefined;
 
-  // 1. Direct match
-  const direct = tasks.get(idOrAlias);
+  let direct = getTask(idOrAlias);
   if (direct && !direct.id.startsWith('temp_')) {
     return direct;
   }
 
   // 2. Match by clientTaskId
+  for (const t of tasks.values()) {
+    if (t.clientTaskId === idOrAlias) {
+      return t;
+    }
+  }
+
+  // Reload once more in case clientTaskId was stored on disk
+  loadFromDisk(true);
   for (const t of tasks.values()) {
     if (t.clientTaskId === idOrAlias) {
       return t;

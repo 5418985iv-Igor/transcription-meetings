@@ -521,14 +521,14 @@ export function RecentTasks({
 
                     {/* Action buttons */}
                     <div className="flex items-center gap-2 self-end sm:self-center shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 w-full sm:w-auto justify-end flex-wrap">
-                      {/* CONTINUE / RESUME TRANSCRIPTION BUTTON */}
-                      {(!isFinished || isError) && (
+                      {/* CONTINUE / RESUME TRANSCRIPTION BUTTON (ONLY if audio not yet transcribed/normalized) */}
+                      {(!isFinished || isError) && !t.normalizedText && (
                         <button
                           type="button"
                           id={`resume-task-btn-${t.id}`}
                           onClick={() => onResumeTask(t.id, t.fileName)}
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 transition-colors shadow-xs"
-                          title="Продолжить опрос сервера и завершить цепочку создания протокола"
+                          title="Продолжить опрос сервера и завершить распознавание"
                         >
                           <Play className="w-3.5 h-3.5 fill-white" />
                           <span>Продолжить расшифровку</span>
@@ -536,7 +536,7 @@ export function RecentTasks({
                       )}
 
                       {/* ENTER / LINK REAL TASK ID BUTTON */}
-                      {(isTemp || isError) && (
+                      {(isTemp || isError) && !t.normalizedText && (
                         <button
                           type="button"
                           onClick={() => {
@@ -551,29 +551,31 @@ export function RecentTasks({
                         </button>
                       )}
 
-                      {/* OPEN COMPLETED RESULT BUTTON */}
-                      {isFinished && (
+                      {/* OPEN COMPLETED / NORMALIZED RESULT BUTTON */}
+                      {(isFinished || Boolean(t.normalizedText)) && (
                         <>
-                          <button
-                            type="button"
-                            id={`download-docx-task-btn-${t.id}`}
-                            onClick={(e) => handleDownloadTaskWord(t, e)}
-                            disabled={downloadingWordId === t.id}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200/80 transition-colors shadow-2xs"
-                            title="Сохранить протокол в документ Word (.docx)"
-                          >
-                            {downloadingWordId === t.id ? (
-                              <>
-                                <span className="w-3.5 h-3.5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                                <span>Word...</span>
-                              </>
-                            ) : (
-                              <>
-                                <FileDown className="w-3.5 h-3.5 text-blue-600" />
-                                <span>Word .docx</span>
-                              </>
-                            )}
-                          </button>
+                          {t.protocolText && (
+                            <button
+                              type="button"
+                              id={`download-docx-task-btn-${t.id}`}
+                              onClick={(e) => handleDownloadTaskWord(t, e)}
+                              disabled={downloadingWordId === t.id}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200/80 transition-colors shadow-2xs"
+                              title="Сохранить протокол в документ Word (.docx)"
+                            >
+                              {downloadingWordId === t.id ? (
+                                <>
+                                  <span className="w-3.5 h-3.5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                                  <span>Word...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <FileDown className="w-3.5 h-3.5 text-blue-600" />
+                                  <span>Word .docx</span>
+                                </>
+                              )}
+                            </button>
+                          )}
 
                           <button
                             type="button"
@@ -587,13 +589,13 @@ export function RecentTasks({
                         </>
                       )}
 
-                      {/* RE-GENERATE PROTOCOL IF RAW TEXT EXISTS BUT ERRORED */}
-                      {isError && hasRawText && (
+                      {/* RE-GENERATE PROTOCOL IF RAW OR NORMALIZED TEXT EXISTS BUT ERRORED */}
+                      {isError && (hasRawText || Boolean(t.normalizedText)) && (
                         <button
                           type="button"
-                          onClick={() => onResumeTask(t.id, t.fileName)}
+                          onClick={() => onSelectTask(t.id)}
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 transition-colors"
-                          title="Стенограмма уже сохранена! Повторить создание протокола через ИИ"
+                          title="Текст сохранен! Открыть и сформировать протокол через ИИ"
                         >
                           <RotateCcw className="w-3.5 h-3.5 text-purple-600" />
                           <span className="hidden md:inline">Сформировать протокол</span>
