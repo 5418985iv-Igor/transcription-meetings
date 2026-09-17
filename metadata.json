@@ -1,0 +1,6 @@
+{
+  "name": "Ю-Терм. Протоколы совещаний",
+  "description": "Сервис расшифровки аудиозаписей встреч с нормализацией текста и автоматической подготовкой структурированных протоколов совещаний.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

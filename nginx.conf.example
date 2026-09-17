@@ -1,0 +1,24 @@
+# Пример конфигурации Nginx для сайта https://vivonline.ru
+# Вставьте этот блок внутри вашей существующей секции server { server_name vivonline.ru; ... }
+
+location /meetings {
+    # Проксирование на контейнер приложения Next.js
+    proxy_pass http://127.0.0.1:3000;
+    proxy_http_version 1.1;
+
+    # Заголовки для правильной маршрутизации и WebSocket
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection 'upgrade';
+    proxy_set_header Host $host;
+    proxy_cache_bypass $http_upgrade;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    # Максимальный размер загружаемого аудиофайла (например, до 100 МБ)
+    client_max_body_size 100M;
+
+    # Таймауты для длительных операций загрузки и распознавания
+    proxy_read_timeout 300s;
+    proxy_connect_timeout 75s;
+}
