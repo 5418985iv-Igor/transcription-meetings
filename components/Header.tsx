@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { FileText, CheckCircle2, AlertCircle, RefreshCw, Activity, RotateCcw } from 'lucide-react';
+import { FileText, Activity, RotateCcw } from 'lucide-react';
 
 interface HeaderProps {
   serverOnline?: boolean | null;
@@ -38,7 +38,7 @@ export function Header({
           </div>
         </div>
 
-        {/* Actions & Server Status indicator */}
+        {/* Actions */}
         <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
           {onNewRecording && (
             <button
@@ -78,23 +78,6 @@ export function Header({
                 }`}
               />
             </button>
-          )}
-
-          {serverOnline === null ? (
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
-              <span className="w-2 h-2 rounded-full bg-slate-400 animate-pulse" />
-              Подключение...
-            </div>
-          ) : serverOnline ? (
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-              <span>GigaSTT онлайн</span>
-            </div>
-          ) : (
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200">
-              <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
-              <span>Сервер офлайн</span>
-            </div>
           )}
         </div>
       </div>
