@@ -50,10 +50,10 @@ export function Header({
                   ? 'bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white shadow-indigo-200'
                   : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/70'
               }`}
-              title="Загрузить новое совещание"
+              title="Загрузить новый протокол"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span>Новое</span>
+              <span>Новый протокол</span>
             </button>
           )}
 
