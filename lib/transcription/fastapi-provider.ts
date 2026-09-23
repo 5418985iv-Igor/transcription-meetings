@@ -42,7 +42,7 @@ export class FastApiTranscriptionService implements ITranscriptionService {
         ) {
           if (response.status === 413) {
             throw new Error(
-              'Размер аудиофайла превысил лимит сервера распознавания речи (413 Payload Too Large). Пожалуйста, используйте запись до 30 МБ.'
+              'Размер аудиофайла превысил лимит сервера распознавания речи (413 Payload Too Large). Пожалуйста, используйте запись до 100 МБ.'
             );
           }
           if (response.status === 502 || response.status === 504) {

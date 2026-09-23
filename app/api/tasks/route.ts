@@ -23,11 +23,11 @@ export async function POST(req: NextRequest) {
     const fileSize = file.size;
 
     // Check maximum payload limit for stable cloud proxy handling
-    const MAX_ALLOWED_SIZE = 30 * 1024 * 1024; // 30 MB
+    const MAX_ALLOWED_SIZE = 100 * 1024 * 1024; // 100 MB
     if (fileSize > MAX_ALLOWED_SIZE) {
       return NextResponse.json(
         {
-          error: `Размер аудиофайла (${(fileSize / (1024 * 1024)).toFixed(1)} МБ) превышает лимит сервера (30 МБ). Рекомендуется сжать аудио или выбрать формат M4A/MP3.`,
+          error: `Размер аудиофайла (${(fileSize / (1024 * 1024)).toFixed(1)} МБ) превышает лимит сервера (100 МБ). Рекомендуется сжать аудио или выбрать формат M4A/MP3.`,
         },
         { status: 400 }
       );

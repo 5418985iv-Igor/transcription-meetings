@@ -279,7 +279,7 @@ export default function MeetingProtocolsPage() {
     stopPolling();
 
     // Check size on client side to protect against proxy aborts
-    const MAX_FILE_SIZE = 30 * 1024 * 1024; // 30 MB
+    const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
     if (file.size > MAX_FILE_SIZE) {
       const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
       setCurrentTask({
@@ -289,7 +289,7 @@ export default function MeetingProtocolsPage() {
         fileSize: file.size,
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        error: `Размер аудиофайла (${sizeMb} МБ) превышает лимит сервера (30 МБ). Рекомендуется использовать сжатый формат (M4A/MP3).`,
+        error: `Размер аудиофайла (${sizeMb} МБ) превышает лимит сервера (100 МБ). Рекомендуется использовать сжатый формат (M4A/MP3).`,
         stepMessage: 'Файл слишком велик для загрузки',
       });
       return;
@@ -369,7 +369,7 @@ export default function MeetingProtocolsPage() {
             if (xhr.status === 413) {
               reject(
                 new Error(
-                  'Размер аудиофайла превысил лимит сервера (413 Payload Too Large). Пожалуйста, выберите файл до 30 МБ.'
+                  'Размер аудиофайла превысил лимит сервера (413 Payload Too Large). Пожалуйста, выберите файл до 100 МБ.'
                 )
               );
             } else if (xhr.status === 504) {

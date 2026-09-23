@@ -3,7 +3,7 @@
 import React, { useRef, useState, useCallback } from 'react';
 import { UploadCloud, Music, X, Play, Pause, ArrowRight, AlertCircle } from 'lucide-react';
 
-const MAX_FILE_SIZE_BYTES = 30 * 1024 * 1024; // 30 MB safe web limit
+const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024; // 100 MB safe web limit
 
 interface AudioUploaderProps {
   onStartUpload: (file: File) => void;
@@ -122,7 +122,7 @@ export function AudioUploader({ onStartUpload, disabled }: AudioUploaderProps) {
             Выберите аудиозапись совещания
           </h3>
           <p className="text-sm text-slate-500 max-w-md mb-4">
-            Перетащите файл сюда или нажмите для выбора на компьютере. Поддерживаются форматы M4A, MP3, WAV, AAC, OGG (до 30 МБ).
+            Перетащите файл сюда или нажмите для выбора на компьютере. Поддерживаются форматы M4A, MP3, WAV, AAC, OGG (до 100 МБ).
           </p>
 
           <button
@@ -192,16 +192,16 @@ export function AudioUploader({ onStartUpload, disabled }: AudioUploaderProps) {
             </div>
           </div>
 
-          {/* Warning when file exceeds 30MB */}
+          {/* Warning when file exceeds 100MB */}
           {isFileTooLarge && (
             <div className="p-3.5 bg-amber-50 border border-amber-200/80 rounded-xl text-xs text-amber-900 flex items-start gap-2.5">
               <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
               <div className="space-y-1">
                 <p className="font-semibold">
-                  Размер файла ({formatFileSize(selectedFile.size)}) превышает лимит веб-загрузки (30 МБ)
+                  Размер файла ({formatFileSize(selectedFile.size)}) превышает лимит веб-загрузки (100 МБ)
                 </p>
                 <p className="text-amber-700">
-                  Облачный веб-сервер принимает аудиофайлы размером до 30 МБ. Чтобы передать даже многочасовую запись, сохраните её в формате <strong>M4A (AAC 32–64 kbps)</strong> или <strong>MP3</strong> (в таком виде 1 час занимает всего 15–25 МБ).
+                  Облачный веб-сервер принимает аудиофайлы размером до 100 МБ. Чтобы передать даже многочасовую запись, сохраните её в формате <strong>M4A (AAC 32–64 kbps)</strong> или <strong>MP3</strong> (в таком виде 1 час занимает всего 15–25 МБ).
                 </p>
               </div>
             </div>
