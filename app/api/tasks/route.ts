@@ -4,6 +4,7 @@ import { saveTask, getAllTasks, findTask, linkTasks, updateTask } from '@/lib/ta
 import { startBackgroundPoller, runAiPipeline } from '@/lib/tasks/coordinator';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 300; // Allow up to 5 minutes for uploading large audio files
 
 export async function POST(req: NextRequest) {
   let currentClientTaskId: string | undefined = undefined;
@@ -13,9 +14,9 @@ export async function POST(req: NextRequest) {
     const clientTaskId = (formData.get('clientTaskId') as string) || undefined;
     currentClientTaskId = clientTaskId;
 
-    if (!file || !(file instanceof Blob)) {
+    if (!file || !(file instanceof Blob) || file.size === 0) {
       return NextResponse.json(
-        { error: 'Необходимо предоставить аудиофайл для обработки' },
+        { error: 'Предоставленный аудиофайл пуст (0 байт). Пожалуйста, выберите корректную аудиозапись.' },
         { status: 400 }
       );
     }

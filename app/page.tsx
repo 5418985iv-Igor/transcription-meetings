@@ -604,6 +604,13 @@ export default function MeetingProtocolsPage() {
       void handleRegenerateProtocol();
       return;
     }
+    // If the task failed at transcription stage with a server-side error (e.g. 400 Bad Request),
+    // polling the same task ID won't resurrect it; reset to allow re-uploading the audio file
+    if (currentTask.status === 'error' && !currentTask.rawText && currentTask.error?.includes('400')) {
+      stopPolling();
+      setCurrentTask(null);
+      return;
+    }
     void handleResumeTask(currentTask.id, currentTask.fileName);
   };
 
@@ -725,6 +732,10 @@ export default function MeetingProtocolsPage() {
               taskId={currentTask.id}
               uploadProgress={uploadProgress}
               hasNormalizedText={Boolean(currentTask.normalizedText?.trim())}
+              onReset={() => {
+                stopPolling();
+                setCurrentTask(null);
+              }}
             />
           )}
 

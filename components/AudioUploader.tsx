@@ -80,10 +80,11 @@ export function AudioUploader({ onStartUpload, disabled }: AudioUploaderProps) {
     return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
   };
 
+  const isFileEmpty = selectedFile ? selectedFile.size === 0 : false;
   const isFileTooLarge = selectedFile ? selectedFile.size > MAX_FILE_SIZE_BYTES : false;
 
   const handleSubmit = () => {
-    if (selectedFile && !disabled && !isFileTooLarge) {
+    if (selectedFile && !disabled && !isFileTooLarge && !isFileEmpty) {
       onStartUpload(selectedFile);
     }
   };
@@ -207,6 +208,19 @@ export function AudioUploader({ onStartUpload, disabled }: AudioUploaderProps) {
             </div>
           )}
 
+          {/* Warning when file is empty (0 bytes) */}
+          {isFileEmpty && (
+            <div className="p-3.5 bg-amber-50 border border-amber-200/80 rounded-xl text-xs text-amber-900 flex items-start gap-2.5">
+              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-semibold">Выбранный аудиофайл пуст (0 байт)</p>
+                <p className="text-amber-700">
+                  Файл не содержит звуковых данных. Пожалуйста, выберите корректную запись совещания.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Hidden audio element for preview */}
           {audioUrl && (
             <audio
@@ -223,7 +237,7 @@ export function AudioUploader({ onStartUpload, disabled }: AudioUploaderProps) {
               type="button"
               id="start-process-btn"
               onClick={handleSubmit}
-              disabled={disabled || isFileTooLarge}
+              disabled={disabled || isFileTooLarge || isFileEmpty}
               className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 text-white font-medium text-sm hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-all"
             >
               <span>Начать обработку</span>

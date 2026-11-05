@@ -23,6 +23,7 @@ interface StatusIndicatorProps {
   taskId?: string;
   uploadProgress?: number | null;
   hasNormalizedText?: boolean;
+  onReset?: () => void;
 }
 
 interface StepConfig {
@@ -68,6 +69,7 @@ export function StatusIndicator({
   taskId,
   uploadProgress,
   hasNormalizedText,
+  onReset,
 }: StatusIndicatorProps) {
   const [copied, setCopied] = useState(false);
 
@@ -140,8 +142,8 @@ export function StatusIndicator({
               </div>
             )}
 
-            {onRetry && (
-              <div>
+            <div className="flex flex-wrap items-center gap-2">
+              {onRetry && (
                 <button
                   type="button"
                   onClick={onRetry}
@@ -150,8 +152,18 @@ export function StatusIndicator({
                   <RefreshCw className="w-3.5 h-3.5" />
                   {hasNormalizedText ? 'Сформировать протокол заново (ИИ)' : 'Повторить попытку'}
                 </button>
-              </div>
-            )}
+              )}
+              {onReset && (
+                <button
+                  type="button"
+                  onClick={onReset}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-red-200 text-red-800 text-xs font-medium hover:bg-red-100/70 transition-colors shadow-xs"
+                >
+                  <UploadCloud className="w-3.5 h-3.5" />
+                  Загрузить аудиозапись заново
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>

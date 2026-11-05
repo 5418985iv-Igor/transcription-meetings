@@ -86,6 +86,9 @@ function loadFromDisk(force = false) {
       const raw = fs.readFileSync(DATA_FILE, 'utf-8');
       const loaded = JSON.parse(raw) as TaskRecord[];
       if (Array.isArray(loaded)) {
+        if (force) {
+          tasks.clear();
+        }
         for (const item of loaded) {
           if (item && item.id) {
             tasks.set(item.id, item);

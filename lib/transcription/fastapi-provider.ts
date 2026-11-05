@@ -2,7 +2,7 @@ import { ITranscriptionService, TranscriptionTaskResult, HealthCheckResult } fro
 
 export class FastApiTranscriptionService implements ITranscriptionService {
   getBaseUrl(): string {
-    return process.env.FASTAPI_API_URL?.trim() || 'http://127.0.0.1:9876';
+    return process.env.FASTAPI_API_URL?.trim() || 'http://157.22.175.215:8000';
   }
 
   async createTask(
@@ -26,6 +26,13 @@ export class FastApiTranscriptionService implements ITranscriptionService {
       binaryData = new Uint8Array(fileData as ArrayBuffer);
     }
 
+    // Guard against empty files which trigger HTTP 400 Bad Request in GigaSTT
+    if (binaryData.byteLength === 0) {
+      throw new Error(
+        'Предоставленный аудиофайл пуст (0 байт). Пожалуйста, выберите корректную аудиозапись для распознавания.'
+      );
+    }
+
     // 2. Resolve clean audio MIME type and file extension
     let cleanMimeType = mimeType?.trim();
     const lowerName = (filename || '').toLowerCase();
@@ -39,6 +46,7 @@ export class FastApiTranscriptionService implements ITranscriptionService {
       else cleanMimeType = 'audio/m4a';
     }
     const cleanFileName = filename || (cleanMimeType.includes('wav') ? 'meeting.wav' : 'meeting.m4a');
+    const safeFileName = cleanFileName.replace(/[\r\n"]/g, '_');
 
     // 3. Construct binary Blob for multipart submission
     const audioBlob = new Blob([binaryData as unknown as BlobPart], { type: cleanMimeType });
@@ -49,7 +57,7 @@ export class FastApiTranscriptionService implements ITranscriptionService {
     const formData = new FormData();
     formData.append('model', 'whisper-1');
     formData.append('language', 'ru');
-    formData.append('file', audioBlob, cleanFileName);
+    formData.append('file', audioBlob, safeFileName);
 
     try {
       // NOTE: We do NOT set 'Content-Type: multipart/form-data' header manually.
@@ -61,7 +69,7 @@ export class FastApiTranscriptionService implements ITranscriptionService {
         headers: {
           Accept: 'application/json',
         },
-        signal: AbortSignal.timeout(120000), // 120s timeout for audio uploads
+        signal: AbortSignal.timeout(300000), // 300s timeout for large audio uploads (up to 100MB)
       });
 
       const responseText = await response.text();
@@ -209,10 +217,15 @@ export class FastApiTranscriptionService implements ITranscriptionService {
         mappedStatus = 'failed';
       }
 
+      let taskError = typeof data.error === 'string' ? data.error : undefined;
+      if (taskError && taskError.includes('400 Bad Request')) {
+        taskError = `${taskError}\n(Сервер распознавания речи отклонил аудиофайл: файл пуст, повреждён или содержит недопустимый заголовок. Пожалуйста, загрузите запись заново).`;
+      }
+
       return {
         status: mappedStatus,
         text: typeof data.text === 'string' ? data.text : undefined,
-        error: typeof data.error === 'string' ? data.error : undefined,
+        error: taskError,
       };
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);

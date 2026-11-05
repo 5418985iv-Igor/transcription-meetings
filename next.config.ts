@@ -31,7 +31,7 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   experimental: {
     serverActions: {
-      bodySizeLimit: '50mb',
+      bodySizeLimit: '120mb',
     },
   },
   transpilePackages: ['motion'],
