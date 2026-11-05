@@ -30,7 +30,7 @@ export interface ITranscriptionService {
     fileData: Buffer | Blob | Uint8Array,
     filename: string,
     mimeType?: string
-  ): Promise<{ taskId: string }>;
+  ): Promise<{ taskId: string; text?: string }>;
 
   /**
    * Polls the status of an ongoing transcription task.

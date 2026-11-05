@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { transcriptionService } from '@/lib/transcription/fastapi-provider';
-import { saveTask, getAllTasks, findTask, linkTasks } from '@/lib/tasks/store';
-import { startBackgroundPoller } from '@/lib/tasks/coordinator';
+import { saveTask, getAllTasks, findTask, linkTasks, updateTask } from '@/lib/tasks/store';
+import { startBackgroundPoller, runAiPipeline } from '@/lib/tasks/coordinator';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
+  let currentClientTaskId: string | undefined = undefined;
   try {
     const formData = await req.formData();
     const file = formData.get('file');
     const clientTaskId = (formData.get('clientTaskId') as string) || undefined;
+    currentClientTaskId = clientTaskId;
 
     if (!file || !(file instanceof Blob)) {
       return NextResponse.json(
@@ -47,40 +49,63 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Call external FastAPI server directly with the Blob (no redundant in-memory buffer duplication)
-    const { taskId } = await transcriptionService.createTask(file, fileName, mimeType);
+    // Forward audio file to GigaSTT
+    const result = await transcriptionService.createTask(file, fileName, mimeType);
+    const taskId = result.taskId;
 
     // Register real task in local task store
     saveTask({
       id: taskId,
       clientTaskId,
-      status: 'transcribing',
-      fastApiStatus: 'queued',
+      status: result.text ? 'normalizing' : 'transcribing',
+      fastApiStatus: result.text ? 'completed' : 'queued',
+      rawText: result.text,
       fileName,
       fileSize,
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      stepMessage: 'Аудиофайл передан на сервис распознавания речи (GigaSTT)...',
+      stepMessage: result.text
+        ? 'Транскрибация получена! Запуск формирования протокола...'
+        : 'Аудиофайл передан на сервис распознавания речи (GigaSTT)...',
     });
 
     if (clientTaskId) {
       linkTasks(clientTaskId, taskId);
     }
 
-    // Start server-side background poller so processing continues even if client disconnects
-    startBackgroundPoller(taskId);
+    if (result.text) {
+      // If GigaSTT responded synchronously with transcript text, immediately launch AI protocol generation
+      void runAiPipeline(taskId, result.text);
+    } else {
+      // Start server-side background poller so processing continues even if client disconnects
+      startBackgroundPoller(taskId);
+    }
 
     // Return taskId immediately without keeping connection open
     return NextResponse.json({
       success: true,
       taskId,
       clientTaskId,
-      status: 'transcribing',
+      status: result.text ? 'normalizing' : 'transcribing',
       fileName,
       fileSize,
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
+    console.error('[Tasks API Diagnostics] Failed to process audio task submission', {
+      stage: 'api_tasks_post',
+      clientTaskId: currentClientTaskId,
+      error: message,
+    });
+
+    if (currentClientTaskId) {
+      updateTask(currentClientTaskId, {
+        status: 'error',
+        error: message,
+        stepMessage: 'Сбой при отправке аудио на сервис распознавания речи',
+      });
+    }
+
     return NextResponse.json(
       { error: message || 'Внутренняя ошибка при загрузке аудиофайла' },
       { status: 500 }

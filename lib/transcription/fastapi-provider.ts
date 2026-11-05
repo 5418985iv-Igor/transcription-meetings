@@ -2,28 +2,59 @@ import { ITranscriptionService, TranscriptionTaskResult, HealthCheckResult } fro
 
 export class FastApiTranscriptionService implements ITranscriptionService {
   getBaseUrl(): string {
-    return process.env.FASTAPI_API_URL?.trim() || 'http://157.22.175.215:8000';
+    return process.env.FASTAPI_API_URL?.trim() || 'http://127.0.0.1:9876';
   }
 
   async createTask(
     fileData: Buffer | Blob | Uint8Array,
     filename: string,
     mimeType: string = 'audio/m4a'
-  ): Promise<{ taskId: string }> {
+  ): Promise<{ taskId: string; text?: string }> {
     const baseUrl = this.getBaseUrl().replace(/\/+$/, '');
     const uploadUrl = `${baseUrl}/v1/audio/transcriptions`;
 
-    // Construct FormData with Blob without unnecessary re-allocations
+    // 1. Convert input to contiguous in-memory binary buffer to guarantee valid byte payload
+    let binaryData: Uint8Array;
+    if (fileData instanceof Blob) {
+      const arrayBuffer = await fileData.arrayBuffer();
+      binaryData = new Uint8Array(arrayBuffer);
+    } else if (Buffer.isBuffer(fileData)) {
+      binaryData = new Uint8Array(fileData.buffer, fileData.byteOffset, fileData.byteLength);
+    } else if (fileData instanceof Uint8Array) {
+      binaryData = fileData;
+    } else {
+      binaryData = new Uint8Array(fileData as ArrayBuffer);
+    }
+
+    // 2. Resolve clean audio MIME type and file extension
+    let cleanMimeType = mimeType?.trim();
+    const lowerName = (filename || '').toLowerCase();
+    if (!cleanMimeType || cleanMimeType === 'application/octet-stream') {
+      if (lowerName.endsWith('.wav')) cleanMimeType = 'audio/wav';
+      else if (lowerName.endsWith('.mp3')) cleanMimeType = 'audio/mpeg';
+      else if (lowerName.endsWith('.ogg')) cleanMimeType = 'audio/ogg';
+      else if (lowerName.endsWith('.flac')) cleanMimeType = 'audio/flac';
+      else if (lowerName.endsWith('.aac')) cleanMimeType = 'audio/aac';
+      else if (lowerName.endsWith('.webm')) cleanMimeType = 'audio/webm';
+      else cleanMimeType = 'audio/m4a';
+    }
+    const cleanFileName = filename || (cleanMimeType.includes('wav') ? 'meeting.wav' : 'meeting.m4a');
+
+    // 3. Construct binary Blob for multipart submission
+    const audioBlob = new Blob([binaryData as unknown as BlobPart], { type: cleanMimeType });
+
+    // 4. Construct standard FormData.
+    // Important: Scalar parameters (model, language) are added first, followed by the binary 'file' field.
+    // This conforms to strict multipart stream parsers (such as Axum/multer in GigaSTT).
     const formData = new FormData();
-    const blob =
-      fileData instanceof Blob
-        ? fileData
-        : new Blob([new Uint8Array(fileData)], { type: mimeType });
-    formData.append('file', blob, filename || 'meeting-audio.m4a');
     formData.append('model', 'whisper-1');
     formData.append('language', 'ru');
+    formData.append('file', audioBlob, cleanFileName);
 
     try {
+      // NOTE: We do NOT set 'Content-Type: multipart/form-data' header manually.
+      // Fetch / FormData automatically calculates the correct boundary and sets:
+      // Content-Type: multipart/form-data; boundary=... and the correct Content-Length.
       const response = await fetch(uploadUrl, {
         method: 'POST',
         body: formData,
@@ -36,6 +67,26 @@ export class FastApiTranscriptionService implements ITranscriptionService {
       const responseText = await response.text();
 
       if (!response.ok) {
+        // Safe diagnostic logging: status code, response body, processing stage (no audio data or secrets)
+        console.error('[GigaSTT Diagnostics] Failed to create transcription task', {
+          stage: 'upload_audio_to_gigastt',
+          endpoint: uploadUrl,
+          statusCode: response.status,
+          statusText: response.statusText,
+          responseSnippet: responseText.slice(0, 300),
+          fileName: cleanFileName,
+          fileSizeBytes: binaryData.byteLength,
+          mimeType: cleanMimeType,
+        });
+
+        if (response.status === 400) {
+          throw new Error(
+            `Сервер GigaSTT вернул ошибку HTTP 400 Bad Request: ${
+              responseText || 'Неверный формат multipart/form-data запроса'
+            }`
+          );
+        }
+
         if (
           responseText.trim().toLowerCase().startsWith('<!doctype') ||
           responseText.includes('<html')
@@ -72,13 +123,19 @@ export class FastApiTranscriptionService implements ITranscriptionService {
         throw new Error(`Некорректный ответ сервера транскрибации: ${responseText.slice(0, 150)}`);
       }
 
-      const taskId = data.task_id || data.taskId || data.id;
+      let taskId = data.task_id || data.taskId || data.id;
+      const directText = typeof data.text === 'string' ? data.text.trim() : undefined;
 
+      // Handle both asynchronous queue (task_id) and synchronous transcription ({ text: "..." })
       if (!taskId) {
-        throw new Error('Сервер транскрибации не вернул идентификатор задачи (task_id)');
+        if (directText !== undefined) {
+          taskId = `gigastt_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        } else {
+          throw new Error('Сервер транскрибации не вернул идентификатор задачи (task_id) или текст');
+        }
       }
 
-      return { taskId: String(taskId) };
+      return { taskId: String(taskId), text: directText };
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       throw new Error(`Ошибка отправки аудио на распознавание: ${message}`);
@@ -108,6 +165,15 @@ export class FastApiTranscriptionService implements ITranscriptionService {
       const responseText = await response.text();
 
       if (!response.ok) {
+        console.error('[GigaSTT Diagnostics] Failed to query task status', {
+          stage: 'get_task_status',
+          endpoint: taskUrl,
+          taskId,
+          statusCode: response.status,
+          statusText: response.statusText,
+          responseSnippet: responseText.slice(0, 300),
+        });
+
         if (response.status === 404) {
           return {
             status: 'failed',
